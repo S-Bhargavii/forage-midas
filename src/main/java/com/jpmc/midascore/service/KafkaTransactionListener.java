@@ -1,6 +1,7 @@
 package com.jpmc.midascore.service;
 import com.jpmc.midascore.entity.TransactionRecord;
 import com.jpmc.midascore.entity.UserRecord;
+import com.jpmc.midascore.foundation.Incentive;
 import com.jpmc.midascore.foundation.Transaction;
 import com.jpmc.midascore.repository.TransactionRepository;
 import com.jpmc.midascore.repository.UserRepository;
@@ -9,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.List;
 import java.util.Optional;
@@ -25,6 +27,9 @@ public class KafkaTransactionListener {
 
     @Autowired
     private TransactionRepository transactionRepository;
+
+    @Autowired
+    private IncentiveService incentiveService;
 
     @KafkaListener(groupId = "${spring.kafka.consumer.group-id}", topics = "${general.kafka-topic}")
     public void listen(Transaction transaction){
@@ -60,7 +65,8 @@ public class KafkaTransactionListener {
                 } else {
                     // update balances
                     sender.get().setBalance(balance - amount);
-                    recipient.get().setBalance(recipient.get().getBalance() + amount);
+                    float incentive = incentiveService.fetchIncentive(transaction);
+                    recipient.get().setBalance(recipient.get().getBalance() + amount + incentive);
 
                     // save the updated user balance information
                     userRepository.save(sender.get());
@@ -80,5 +86,4 @@ public class KafkaTransactionListener {
             logger.error("An error occurred while processing the transaction: {}", e.toString());
         }
     }
-
 }
